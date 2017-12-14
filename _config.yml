@@ -1,0 +1,23 @@
+# Site settings
+title: Pwned by ThomasKing
+email: ThomasKingNew@hotmail.com
+description: > # this means to ignore newlines until "baseurl:"
+  Pwn everything including myself.
+baseurl: "" # the subpath of your site, e.g. /blog/
+url: "http://thomasking2014.github.io" # the base hostname & protocol for your site
+twitter_username: ThomasKing2014
+github_username:  ThomasKing2014
+flickr_url: ""
+disqus_shortname: thomasking2014githubio
+
+imageurl: "https://thomasking2014.github.io/images"
+
+# Build settings
+markdown: kramdown
+kramdown:
+        input: GFM
+        hard_wrap: true
+        syntax_highlighter_opts:
+                disable: true
+# _pages
+include: ['_pages']
