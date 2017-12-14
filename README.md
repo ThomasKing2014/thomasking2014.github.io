@@ -1,1 +1,1 @@
-Blog模板fork from [康哥](http://scateu.me/)
+Blog template fork from [康哥](http://scateu.me/)
