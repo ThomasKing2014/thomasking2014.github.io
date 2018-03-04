@@ -14,4 +14,4 @@ Ref: [Android Security Bulletin—January 2017](https://source.android.com/secur
 Ref: [Android Security Bulletin—May 2017](https://source.android.com/security/bulletin/2017-05-01.html)
 #### CVE-2017-13164
 Can be used to bypass PAN mitigation stably.
-Ref: [Android Security Bulletin—May 2017](https://source.android.com/security/bulletin/pixel/2017-12-01.html)
+Ref: [Pixel / Nexus Security Bulletin—December 2017](https://source.android.com/security/bulletin/pixel/2017-12-01.html)
