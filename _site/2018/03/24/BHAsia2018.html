@@ -98,7 +98,8 @@ window.onload = function(){
 
   <article class="post-content">
     
-    <p>Recently, Android 8.0 has released, born with new kernel harden features and more strict SELinux policies enforcing. Rooting large numbers of newest Android devices with one single vulnerability is quite a challenge.</p>
+    <h3 id="abstract">ABSTRACT</h3>
+<p>Recently, Android 8.0 has released, born with new kernel harden features and more strict SELinux policies enforcing. Rooting large numbers of newest Android devices with one single vulnerability is quite a challenge.</p>
 
 <p>In this talk, we will first detail a new rooting solution ReVent. It derives from a Use-After-Free vulnerability due to race condition, which affects all the Android devices shipped with &gt;=3.18 Linux kernel, and can be executed by any untrusted application. Since many different slab objects are frequently allocated/freed on the same heap during exploiting process, it’s quite challenging to shape heap Fengshui and achieve kernel code execution. We will demonstrate how to use the TOCTOU feature of pipe subsystem to gain arbitrary kernel memory overwriting.</p>
 
