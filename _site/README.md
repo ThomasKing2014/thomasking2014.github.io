@@ -1,1 +1,1 @@
-Blog模板fork from [康哥](http://scateu.me/)
+佛系模板 fork from [康哥](http://scateu.me/)

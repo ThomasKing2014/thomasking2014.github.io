@@ -7,12 +7,12 @@
     <meta name="viewport" content="width=device-width initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-    <title>Vulnerabilities</title>
+    <title>KSMA: BREAKING ANDROID KERNEL ISOLATION AND ROOTING WITH ARM MMU FEATURES (BlackHatAsia2018)</title>
     <meta name="description" content="Pwn everything including myself.
 ">
 
     <link rel="stylesheet" href="/assets/css/main.css">
-    <link rel="canonical" href="http://localhost:4000/Vulnerabilities/">
+    <link rel="canonical" href="http://localhost:4000/2018/03/24/BHAsia2018.html">
 </head>
 
 
@@ -59,29 +59,65 @@
 
     <div class="page-content">
       <div class="wrapper">
-        <div class="post">
+         <link href="https://cdn.bootcss.com/prism/1.6.0/themes/prism.min.css" rel="stylesheet">  
+<!--<link href="https://cdn.bootcss.com/prism/1.6.0/themes/prism-tomorrow.min.css" rel="stylesheet">  -->
+
+<script src="https://cdn.bootcss.com/prism/1.6.0/prism.min.js"></script>  
+
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-bash.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-c.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-python.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-makefile.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-go.min.js"></script>  
+
+<script>
+
+//把所有没class的 pre code标签加上一个language-default类别，以便被prism.js处理
+//$('code:not([class])').addClass("language-default");
+
+// 暂时先不用，注释掉。
+/*
+window.onload = function(){
+	var codes = document.querySelectorAll('pre > code:not([class])');
+
+	for(var i = 0; i < codes.length; ++i){
+		codes[i].setAttribute("class","language-default");
+		codes[i].parentNode.setAttribute("class","language-default");
+	}
+};
+*/
+</script>
+
+
+<div class="post">
 
   <header class="post-header">
-    <h1 class="post-title">Vulnerabilities</h1>
+    <h1 class="post-title">KSMA: BREAKING ANDROID KERNEL ISOLATION AND ROOTING WITH ARM MMU FEATURES (BlackHatAsia2018)</h1>
+    <p class="post-meta">Mar 24, 2018</p>
   </header>
 
   <article class="post-content">
-    <h4 id="cve-2016-4038sve-2015-4958">CVE-2016-4038(SVE-2015-4958)</h4>
-<p>Ref: <a href="http://security.samsungmobile.com/smrupdate.html">Samsung Android Security Updates</a></p>
-<h4 id="androidid-31435731cve-2015-8966">AndroidID-31435731(CVE-2015-8966)</h4>
-<p>Ref: <a href="https://source.android.com/security/bulletin/2016-12-01.html">Android Security Bulletin—December 2016</a></p>
-<h4 id="cve-2017-0404">CVE-2017-0404</h4>
-<p>Ref: <a href="https://source.android.com/security/bulletin/2017-01-01.html">Android Security Bulletin—January 2017</a></p>
-<h4 id="cve-2017-0588">CVE-2017-0588</h4>
-<p>Ref: <a href="https://source.android.com/security/bulletin/2017-05-01.html">Android Security Bulletin—May 2017</a></p>
-<h4 id="cve-2017-13164">CVE-2017-13164</h4>
-<p>Can be used to bypass PAN mitigation stably.<br />
-Ref: <a href="https://source.android.com/security/bulletin/pixel/2017-12-01.html">Pixel / Nexus Security Bulletin—December 2017</a></p>
+    
+    <p>Recently, Android 8.0 has released, born with new kernel harden features and more strict SELinux policies enforcing. Rooting large numbers of newest Android devices with one single vulnerability is quite a challenge.</p>
+
+<p>In this talk, we will first detail a new rooting solution ReVent. It derives from a Use-After-Free vulnerability due to race condition, which affects all the Android devices shipped with &gt;=3.18 Linux kernel, and can be executed by any untrusted application. Since many different slab objects are frequently allocated/freed on the same heap during exploiting process, it’s quite challenging to shape heap Fengshui and achieve kernel code execution. We will demonstrate how to use the TOCTOU feature of pipe subsystem to gain arbitrary kernel memory overwriting.</p>
+
+<p>It’s no doubt that using the old public exploitation technique like overwriting ptmx_fops to bypass PXN is straightforward. Unsurprisingly, it can hardly defeat “Oreo” due to PAN mitigation. To bypass PXN and PAN mitigation on Android 8.0, we will introduce a new kernel exploitation technique, named Kernel Space Mirroring Attack(KSMA). It derives from ARM MMU features and enables an attacker to r/w kernel text/data virtual address from user mode(EL0) without any syscalls. Combined with the above vulnerability, the newest Android 8.0 devices can be rooted.</p>
+
+<p>Another rooting solution CPRooter will also be detailed in this presentation. The vulnerability, which affects large numbers of Qualcomm Android devices, enables an attacker to r/w the TTBRx registers. Without constructing all level page tables, modifying the value of any TTBRx registers can lead to the kernel crash. We will demonstrate how to solve the problem with ARM MMU features and construct a 100% reliable exploit chain on Android 64-bit devices using KSMA exploitation technique.</p>
+
+<p>In summary, the ideas of exploitation are fresh, and the new exploitation technique KSMA against Android 8.0 we proposed has never been discussed before.</p>
+
+<hr />
+<p><a href="">SLIDES</a></p>
 
   </article>
 
   
 
+    
+  
+  
 </div>
 
       </div>
