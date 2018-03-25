@@ -6,8 +6,8 @@
 </description>
     <link>http://localhost:4000/</link>
     <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml" />
-    <pubDate>Sun, 25 Mar 2018 15:26:41 +0800</pubDate>
-    <lastBuildDate>Sun, 25 Mar 2018 15:26:41 +0800</lastBuildDate>
+    <pubDate>Sun, 25 Mar 2018 15:38:59 +0800</pubDate>
+    <lastBuildDate>Sun, 25 Mar 2018 15:38:59 +0800</lastBuildDate>
     <generator>Jekyll v3.6.2</generator>
     
       <item>
@@ -23,7 +23,7 @@
 &lt;p&gt;In summary, the ideas of exploitation are fresh, and the new exploitation technique KSMA against Android 8.0 we proposed has never been discussed before.&lt;/p&gt;
 
 &lt;hr /&gt;
-&lt;p&gt;&lt;a href=&quot;&quot;&gt;SLIDES&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;https://github.com/ThomasKing2014/slides/blob/master/asia-18-WANG-KSMA-Breaking-Android-kernel-isolation-and-Rooting-with-ARM-MMU-features.pdf&quot;&gt;SLIDES&lt;/a&gt;&lt;/p&gt;
 </description>
         <pubDate>Sat, 24 Mar 2018 21:13:34 +0800</pubDate>
         <link>http://localhost:4000/2018/03/24/BHAsia2018.html</link>
