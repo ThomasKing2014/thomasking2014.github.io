@@ -6,9 +6,76 @@
 </description>
     <link>http://localhost:4000/</link>
     <atom:link href="http://localhost:4000/feed.xml" rel="self" type="application/rss+xml" />
-    <pubDate>Sun, 25 Mar 2018 15:41:35 +0800</pubDate>
-    <lastBuildDate>Sun, 25 Mar 2018 15:41:35 +0800</lastBuildDate>
+    <pubDate>Sun, 29 Apr 2018 23:50:30 +0800</pubDate>
+    <lastBuildDate>Sun, 29 Apr 2018 23:50:30 +0800</lastBuildDate>
     <generator>Jekyll v3.6.2</generator>
+    
+      <item>
+        <title>HITB2018AMS Badge Reverse Note</title>
+        <description>&lt;h3 id=&quot;0x0-前言&quot;&gt;0x0 前言&lt;/h3&gt;
+&lt;p&gt;演讲前一天拿到Badge，花了小半个小时尝试逆向，因其他事情作罢。今晚无聊，再次尝试，基本搞定，过程其实比较简单。&lt;/p&gt;
+
+&lt;h3 id=&quot;0x1-正文&quot;&gt;0x1 正文&lt;/h3&gt;
+&lt;p&gt;Badge上除了展示会议信息外，另外还有一个secret menu。上下左右ok + esc 6个按键分别对应6个字符的输入。&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_secret_menu.jpg&quot; alt=&quot;&quot; /&gt;&lt;br /&gt;
+考虑到这个板子的代码已经在github开源，尝试在源码中查找线索。&lt;/p&gt;
+
+&lt;p&gt;源码src目录有一个hitb_secret.h文件，展示了这个menu的逻辑。当然，默认的‘000000’并不是实际板子中的code。&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180429_secret_code.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;除了src目录外，hex目录有一个bin文件。如果这个文件只是sample生成的bin，那么只能从硬件逆向入手。不过，我猜测会议方应该不希望把badge搞坏，故继续尝试bin文件逆向。&lt;/p&gt;
+
+&lt;p&gt;加载bin文件到ida，直接搜索关键字符串”ACCESS DENIED!!! :(“。此时，并没有ref的code代码，应该是加载基地址不对。通常，裸机嵌入式设备会对物理地址有一个统一的划分。下载对应的芯片手册，得到如下划分:&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_address.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;演讲前一天误把0x20000000作为加载基地址，发现字符串仍然没有ref，尝试人工及脚本搜索后，发现并不能解决问题，受到安卓保护的影响，以为会存在复杂的混淆及逻辑，限于时间当时遂作罢。不过，当时发现很多ref到0x08000000的基地址时并没有细想。虽然对M系列不熟悉，但这个bin应该有不同的加载区段。今晚直接把base改到0x08000000后，直接ref相关代码逻辑。&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_show_secret_menu.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;找到code: ”LRDROC“。其实可以更暴力点，因为比较字符串都存在rodata，编译生成都在一起。直接搜索”Code: “和”ACCESS DENIED!!! :(“附近的字符串数据，并根据按键编码即可直接找到这个code。输入code得到如下二维码。&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_qrcode.jpg&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;扫描之后，通过短链接跳转到 &lt;a href=&quot;http://hardware.reverser.io/hitb2018ams/challange/&quot;&gt;http://hardware.reverser.io/hitb2018ams/challange/&lt;/a&gt;&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_binary_site.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;遗憾的是，这个服务器已经登陆不上去了。下载对应binary，直接main函数f5找到逻辑。&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_check.png&quot; alt=&quot;&quot; /&gt;&lt;br /&gt;
+&lt;img src=&quot;https://thomasking2014.github.io/images/20180492_file.png&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;大致看了下代码，输入逻辑很简单，依赖了字符库界面，应该是一个字符界面的输入。检验逻辑一般，无花无混淆，至此不再向下逆向。&lt;/p&gt;
+
+&lt;h3 id=&quot;0x2-结尾&quot;&gt;0x2 结尾&lt;/h3&gt;
+&lt;p&gt;不一定非要硬着上去逆逻辑，换个思路借助编译器的处理逻辑可能达到事半功倍的效果。&lt;/p&gt;
+</description>
+        <pubDate>Sun, 29 Apr 2018 22:40:34 +0800</pubDate>
+        <link>http://localhost:4000/2018/04/29/HITBBadgeReverse.html</link>
+        <guid isPermaLink="true">http://localhost:4000/2018/04/29/HITBBadgeReverse.html</guid>
+        
+        
+      </item>
+    
+      <item>
+        <title>Mirror Mirror: Rooting Android 8 with a Kernel Space Mirroring Attack (HITB2018AMS)</title>
+        <description>&lt;h3 id=&quot;abstract&quot;&gt;ABSTRACT&lt;/h3&gt;
+&lt;p&gt;In 2016, several Stagefright inspired mitigations have been added to Android Nougat. One outstanding change is that the mediaserver process does not have all the capabilities like Bluetooth, etc. Those capabilities have been granted to several new daemons. Recently, Android 8.0 has released, born with new kernel harden features(PAN and KASLR, etc.) and more strict SELinux policies enforcing. Rooting large numbers of newest Android devices with one single vulnerability is quite a challenge.&lt;/p&gt;
+
+&lt;p&gt;In this presentation, we will first detail an Out-Of-Bounds writing vulnerability exploitation in media framework. Since the overwriting bytes are ‘0x80’s and the vulnerability is triggered during decoding a crafted mp4 file, it’s quite challenging to shape the memory layout of a remote high privilege process and achieve PC control. We will detail how the shared memory can be used to pad the memory and bypass ASLR, how to escape the SECCOMP sandbox of mediacodec, and control one thread of mediaserver with almost 100% success rate.&lt;/p&gt;
+
+&lt;p&gt;We will detail a new rooting solution ReVent. It derives from a Use-After-Free vulnerability due to race condition, which affects all the Android devices shipped with &amp;gt;=3.18 Linux kernel, and can be executed by any untrusted application. Since many different slab objects are frequently allocated/freed on the same heap during exploiting process, it’s quite challenging to shape heap Fengshui and achieve kernel code execution. We will demonstrate how to use the TOCTOU feature of pipe subsystem to convert Out-Of-Bounds writing to gain arbitrary kernel memory overwriting stably.&lt;/p&gt;
+
+&lt;p&gt;It’s no doubt that using the old public exploitation technique like overwriting ptmx_fops to bypass PXN is straightforward. Unsurprisingly, it can hardly defeat “Oreo” due to PAN mitigation. To bypass PXN and PAN mitigation on Android 8.0, we will introduce a new kernel exploitation technique, named Kernel Space Mirroring Attack(KSMA). It derives from a tiny improper design of the virtual memory translation descriptor of ARM virtual memory system, which violates the Least Privilege secure design principle. This exploitation technique enables an attacker to r/w kernel text/data virtual address from user mode(EL0) without any syscalls. Combined with the above vulnerability, the newest Android 8.0 devices can be rooted.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;https://thomasking2014.github.io/images/HITB2018AMS_Badge.JPG&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
+&lt;hr /&gt;
+&lt;p&gt;&lt;a href=&quot;https://github.com/ThomasKing2014/slides/blob/master/D1T2-Yong-Wang-Rooting-Android-8-with-a-Kernel-Space-Mirroring-Attack.pdf&quot;&gt;SLIDES&lt;/a&gt;&lt;/p&gt;
+</description>
+        <pubDate>Fri, 13 Apr 2018 04:40:34 +0800</pubDate>
+        <link>http://localhost:4000/2018/04/13/HITB2018AMS.html</link>
+        <guid isPermaLink="true">http://localhost:4000/2018/04/13/HITB2018AMS.html</guid>
+        
+        
+      </item>
     
       <item>
         <title>KSMA: BREAKING ANDROID KERNEL ISOLATION AND ROOTING WITH ARM MMU FEATURES (BlackHatAsia2018)</title>
@@ -23,8 +90,11 @@
 
 &lt;p&gt;In summary, the ideas of exploitation are fresh, and the new exploitation technique KSMA against Android 8.0 we proposed has never been discussed before.&lt;/p&gt;
 
+&lt;p&gt;&lt;img src=&quot;https://thomasking2014.github.io/images/BHASIA2018_Badge.JPG&quot; alt=&quot;&quot; /&gt;&lt;/p&gt;
+
 &lt;hr /&gt;
-&lt;p&gt;&lt;a href=&quot;https://github.com/ThomasKing2014/slides/blob/master/asia-18-WANG-KSMA-Breaking-Android-kernel-isolation-and-Rooting-with-ARM-MMU-features.pdf&quot;&gt;SLIDES&lt;/a&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a href=&quot;https://youtu.be/2zGTEv-iUOY&quot;&gt;Rooting video for Android 8&lt;/a&gt;&lt;br /&gt;
+&lt;a href=&quot;https://github.com/ThomasKing2014/slides/blob/master/asia-18-WANG-KSMA-Breaking-Android-kernel-isolation-and-Rooting-with-ARM-MMU-features.pdf&quot;&gt;SLIDES&lt;/a&gt;&lt;/p&gt;
 </description>
         <pubDate>Sat, 24 Mar 2018 21:13:34 +0800</pubDate>
         <link>http://localhost:4000/2018/03/24/BHAsia2018.html</link>

@@ -7,12 +7,12 @@
     <meta name="viewport" content="width=device-width initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-    <title>Pwned by ThomasKing</title>
+    <title>Mirror Mirror: Rooting Android 8 with a Kernel Space Mirroring Attack (HITB2018AMS)</title>
     <meta name="description" content="Pwn everything including myself.
 ">
 
     <link rel="stylesheet" href="/assets/css/main.css">
-    <link rel="canonical" href="http://localhost:4000/">
+    <link rel="canonical" href="http://localhost:4000/2018/04/13/HITB2018AMS.html">
 </head>
 
 
@@ -59,77 +59,66 @@
 
     <div class="page-content">
       <div class="wrapper">
-        <div class="home">
+         <link href="https://cdn.bootcss.com/prism/1.6.0/themes/prism.min.css" rel="stylesheet">  
+<!--<link href="https://cdn.bootcss.com/prism/1.6.0/themes/prism-tomorrow.min.css" rel="stylesheet">  -->
 
-  <!--<h1 class="page-heading">Posts</h1>-->
+<script src="https://cdn.bootcss.com/prism/1.6.0/prism.min.js"></script>  
 
-  <ul class="post-list">
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-bash.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-c.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-python.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-makefile.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-go.min.js"></script>  
+
+<script>
+
+//把所有没class的 pre code标签加上一个language-default类别，以便被prism.js处理
+//$('code:not([class])').addClass("language-default");
+
+// 暂时先不用，注释掉。
+/*
+window.onload = function(){
+	var codes = document.querySelectorAll('pre > code:not([class])');
+
+	for(var i = 0; i < codes.length; ++i){
+		codes[i].setAttribute("class","language-default");
+		codes[i].parentNode.setAttribute("class","language-default");
+	}
+};
+*/
+</script>
+
+
+<div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">Mirror Mirror: Rooting Android 8 with a Kernel Space Mirroring Attack (HITB2018AMS)</h1>
+    <p class="post-meta">Apr 13, 2018</p>
+  </header>
+
+  <article class="post-content">
     
-      <li>
-        <!--<span class="post-meta">Apr 29, 2018</span>-->
-        <span class="post-meta">2018-04-29,Sunday</span>
+    <h3 id="abstract">ABSTRACT</h3>
+<p>In 2016, several Stagefright inspired mitigations have been added to Android Nougat. One outstanding change is that the mediaserver process does not have all the capabilities like Bluetooth, etc. Those capabilities have been granted to several new daemons. Recently, Android 8.0 has released, born with new kernel harden features(PAN and KASLR, etc.) and more strict SELinux policies enforcing. Rooting large numbers of newest Android devices with one single vulnerability is quite a challenge.</p>
 
-        <h1>
-          <a class="post-link" href="/2018/04/29/HITBBadgeReverse.html">HITB2018AMS Badge Reverse Note</a>
-        </h1>
-      </li>
+<p>In this presentation, we will first detail an Out-Of-Bounds writing vulnerability exploitation in media framework. Since the overwriting bytes are ‘0x80’s and the vulnerability is triggered during decoding a crafted mp4 file, it’s quite challenging to shape the memory layout of a remote high privilege process and achieve PC control. We will detail how the shared memory can be used to pad the memory and bypass ASLR, how to escape the SECCOMP sandbox of mediacodec, and control one thread of mediaserver with almost 100% success rate.</p>
+
+<p>We will detail a new rooting solution ReVent. It derives from a Use-After-Free vulnerability due to race condition, which affects all the Android devices shipped with &gt;=3.18 Linux kernel, and can be executed by any untrusted application. Since many different slab objects are frequently allocated/freed on the same heap during exploiting process, it’s quite challenging to shape heap Fengshui and achieve kernel code execution. We will demonstrate how to use the TOCTOU feature of pipe subsystem to convert Out-Of-Bounds writing to gain arbitrary kernel memory overwriting stably.</p>
+
+<p>It’s no doubt that using the old public exploitation technique like overwriting ptmx_fops to bypass PXN is straightforward. Unsurprisingly, it can hardly defeat “Oreo” due to PAN mitigation. To bypass PXN and PAN mitigation on Android 8.0, we will introduce a new kernel exploitation technique, named Kernel Space Mirroring Attack(KSMA). It derives from a tiny improper design of the virtual memory translation descriptor of ARM virtual memory system, which violates the Least Privilege secure design principle. This exploitation technique enables an attacker to r/w kernel text/data virtual address from user mode(EL0) without any syscalls. Combined with the above vulnerability, the newest Android 8.0 devices can be rooted.</p>
+
+<p><img src="https://thomasking2014.github.io/images/HITB2018AMS_Badge.JPG" alt="" /></p>
+
+<hr />
+<p><a href="https://github.com/ThomasKing2014/slides/blob/master/D1T2-Yong-Wang-Rooting-Android-8-with-a-Kernel-Space-Mirroring-Attack.pdf">SLIDES</a></p>
+
+  </article>
+
+  
+
     
-      <li>
-        <!--<span class="post-meta">Apr 13, 2018</span>-->
-        <span class="post-meta">2018-04-13,Friday</span>
-
-        <h1>
-          <a class="post-link" href="/2018/04/13/HITB2018AMS.html">Mirror Mirror: Rooting Android 8 with a Kernel Space Mirroring Attack (HITB2018AMS)</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Mar 24, 2018</span>-->
-        <span class="post-meta">2018-03-24,Saturday</span>
-
-        <h1>
-          <a class="post-link" href="/2018/03/24/BHAsia2018.html">KSMA: BREAKING ANDROID KERNEL ISOLATION AND ROOTING WITH ARM MMU FEATURES (BlackHatAsia2018)</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Feb 24, 2017</span>-->
-        <span class="post-meta">2017-02-24,Friday</span>
-
-        <h1>
-          <a class="post-link" href="/2017/02/24/TinyTool.html">来自高纬的对抗</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Dec 5, 2016</span>-->
-        <span class="post-meta">2016-12-05,Monday</span>
-
-        <h1>
-          <a class="post-link" href="/2016/12/05/CVE-2015-8966.html">Disclosure of AndroidID-31435731</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Dec 21, 2015</span>-->
-        <span class="post-meta">2015-12-21,Monday</span>
-
-        <h1>
-          <a class="post-link" href="/2015/12/21/Obfucation-note.html">记一次混淆算法逆向分析</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Apr 4, 2015</span>-->
-        <span class="post-meta">2015-04-04,Saturday</span>
-
-        <h1>
-          <a class="post-link" href="/2015/04/04/archive.html">早期文章归档</a>
-        </h1>
-      </li>
-    
-  </ul>
-
+  
+  
 </div>
 
       </div>

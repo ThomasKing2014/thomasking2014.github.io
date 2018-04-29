@@ -7,12 +7,12 @@
     <meta name="viewport" content="width=device-width initial-scale=1" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
 
-    <title>Pwned by ThomasKing</title>
+    <title>HITB2018AMS Badge Reverse Note</title>
     <meta name="description" content="Pwn everything including myself.
 ">
 
     <link rel="stylesheet" href="/assets/css/main.css">
-    <link rel="canonical" href="http://localhost:4000/">
+    <link rel="canonical" href="http://localhost:4000/2018/04/29/HITBBadgeReverse.html">
 </head>
 
 
@@ -59,77 +59,87 @@
 
     <div class="page-content">
       <div class="wrapper">
-        <div class="home">
+         <link href="https://cdn.bootcss.com/prism/1.6.0/themes/prism.min.css" rel="stylesheet">  
+<!--<link href="https://cdn.bootcss.com/prism/1.6.0/themes/prism-tomorrow.min.css" rel="stylesheet">  -->
 
-  <!--<h1 class="page-heading">Posts</h1>-->
+<script src="https://cdn.bootcss.com/prism/1.6.0/prism.min.js"></script>  
 
-  <ul class="post-list">
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-bash.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-c.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-python.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-makefile.min.js"></script>  
+<script src="https://cdn.bootcss.com/prism/1.6.0/components/prism-go.min.js"></script>  
+
+<script>
+
+//把所有没class的 pre code标签加上一个language-default类别，以便被prism.js处理
+//$('code:not([class])').addClass("language-default");
+
+// 暂时先不用，注释掉。
+/*
+window.onload = function(){
+	var codes = document.querySelectorAll('pre > code:not([class])');
+
+	for(var i = 0; i < codes.length; ++i){
+		codes[i].setAttribute("class","language-default");
+		codes[i].parentNode.setAttribute("class","language-default");
+	}
+};
+*/
+</script>
+
+
+<div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">HITB2018AMS Badge Reverse Note</h1>
+    <p class="post-meta">Apr 29, 2018</p>
+  </header>
+
+  <article class="post-content">
     
-      <li>
-        <!--<span class="post-meta">Apr 29, 2018</span>-->
-        <span class="post-meta">2018-04-29,Sunday</span>
+    <h3 id="0x0-前言">0x0 前言</h3>
+<p>演讲前一天拿到Badge，花了小半个小时尝试逆向，因其他事情作罢。今晚无聊，再次尝试，基本搞定，过程其实比较简单。</p>
 
-        <h1>
-          <a class="post-link" href="/2018/04/29/HITBBadgeReverse.html">HITB2018AMS Badge Reverse Note</a>
-        </h1>
-      </li>
+<h3 id="0x1-正文">0x1 正文</h3>
+<p>Badge上除了展示会议信息外，另外还有一个secret menu。上下左右ok + esc 6个按键分别对应6个字符的输入。<br />
+<img src="https://thomasking2014.github.io/images/20180492_secret_menu.jpg" alt="" /><br />
+考虑到这个板子的代码已经在github开源，尝试在源码中查找线索。</p>
+
+<p>源码src目录有一个hitb_secret.h文件，展示了这个menu的逻辑。当然，默认的‘000000’并不是实际板子中的code。<br />
+<img src="https://thomasking2014.github.io/images/20180429_secret_code.png" alt="" /></p>
+
+<p>除了src目录外，hex目录有一个bin文件。如果这个文件只是sample生成的bin，那么只能从硬件逆向入手。不过，我猜测会议方应该不希望把badge搞坏，故继续尝试bin文件逆向。</p>
+
+<p>加载bin文件到ida，直接搜索关键字符串”ACCESS DENIED!!! :(“。此时，并没有ref的code代码，应该是加载基地址不对。通常，裸机嵌入式设备会对物理地址有一个统一的划分。下载对应的芯片手册，得到如下划分:<br />
+<img src="https://thomasking2014.github.io/images/20180492_address.png" alt="" /></p>
+
+<p>演讲前一天误把0x20000000作为加载基地址，发现字符串仍然没有ref，尝试人工及脚本搜索后，发现并不能解决问题，受到安卓保护的影响，以为会存在复杂的混淆及逻辑，限于时间当时遂作罢。不过，当时发现很多ref到0x08000000的基地址时并没有细想。虽然对M系列不熟悉，但这个bin应该有不同的加载区段。今晚直接把base改到0x08000000后，直接ref相关代码逻辑。<br />
+<img src="https://thomasking2014.github.io/images/20180492_show_secret_menu.png" alt="" /></p>
+
+<p>找到code: ”LRDROC“。其实可以更暴力点，因为比较字符串都存在rodata，编译生成都在一起。直接搜索”Code: “和”ACCESS DENIED!!! :(“附近的字符串数据，并根据按键编码即可直接找到这个code。输入code得到如下二维码。<br />
+<img src="https://thomasking2014.github.io/images/20180492_qrcode.jpg" alt="" /></p>
+
+<p>扫描之后，通过短链接跳转到 <a href="http://hardware.reverser.io/hitb2018ams/challange/">http://hardware.reverser.io/hitb2018ams/challange/</a></p>
+
+<p><img src="https://thomasking2014.github.io/images/20180492_binary_site.png" alt="" /></p>
+
+<p>遗憾的是，这个服务器已经登陆不上去了。下载对应binary，直接main函数f5找到逻辑。<br />
+<img src="https://thomasking2014.github.io/images/20180492_check.png" alt="" /><br />
+<img src="https://thomasking2014.github.io/images/20180492_file.png" alt="" /></p>
+
+<p>大致看了下代码，输入逻辑很简单，依赖了字符库界面，应该是一个字符界面的输入。检验逻辑一般，无花无混淆，至此不再向下逆向。</p>
+
+<h3 id="0x2-结尾">0x2 结尾</h3>
+<p>不一定非要硬着上去逆逻辑，换个思路借助编译器的处理逻辑可能达到事半功倍的效果。</p>
+
+  </article>
+
+  
+
     
-      <li>
-        <!--<span class="post-meta">Apr 13, 2018</span>-->
-        <span class="post-meta">2018-04-13,Friday</span>
-
-        <h1>
-          <a class="post-link" href="/2018/04/13/HITB2018AMS.html">Mirror Mirror: Rooting Android 8 with a Kernel Space Mirroring Attack (HITB2018AMS)</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Mar 24, 2018</span>-->
-        <span class="post-meta">2018-03-24,Saturday</span>
-
-        <h1>
-          <a class="post-link" href="/2018/03/24/BHAsia2018.html">KSMA: BREAKING ANDROID KERNEL ISOLATION AND ROOTING WITH ARM MMU FEATURES (BlackHatAsia2018)</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Feb 24, 2017</span>-->
-        <span class="post-meta">2017-02-24,Friday</span>
-
-        <h1>
-          <a class="post-link" href="/2017/02/24/TinyTool.html">来自高纬的对抗</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Dec 5, 2016</span>-->
-        <span class="post-meta">2016-12-05,Monday</span>
-
-        <h1>
-          <a class="post-link" href="/2016/12/05/CVE-2015-8966.html">Disclosure of AndroidID-31435731</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Dec 21, 2015</span>-->
-        <span class="post-meta">2015-12-21,Monday</span>
-
-        <h1>
-          <a class="post-link" href="/2015/12/21/Obfucation-note.html">记一次混淆算法逆向分析</a>
-        </h1>
-      </li>
-    
-      <li>
-        <!--<span class="post-meta">Apr 4, 2015</span>-->
-        <span class="post-meta">2015-04-04,Saturday</span>
-
-        <h1>
-          <a class="post-link" href="/2015/04/04/archive.html">早期文章归档</a>
-        </h1>
-      </li>
-    
-  </ul>
-
+  
+  
 </div>
 
       </div>
