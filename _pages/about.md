@@ -6,5 +6,5 @@ permalink: /about/
 $ whoami
 
 	ThomasKing(aka WANG,YONG)
-	Focus on: Android Security, Vulnerability Research, Reverse Engineering
+	Focus on: Android/iOS/Browser Vulnerability Research, Reverse Engineering
 	Twitter/Weibo: @ThomasKing2014
