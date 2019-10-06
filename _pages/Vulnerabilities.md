@@ -21,4 +21,3 @@ REF: [Android Security](https://source.android.com/security/overview/acknowledge
 CVE-2018-9568 is nominated for the best privilege escalation bug at Pwine Award 2019.
 
 ![]({{ "/images/PwnieAward2019.png" | absolute_url }})
-![]({{ site.imageurl }}/PwnieAward2019.png)
