@@ -4,7 +4,7 @@ title: Vulnerabilities
 permalink: /Vulnerabilities/
 ---
 
-#### [Android](https://source.android.com/security/overview/acknowledgements)
+#### Android
 AndroidID-31435731(CVE-2015-8966)
 
 CVE-2016-4038(SVE-2015-4958)
@@ -15,3 +15,9 @@ CVE-2018-9568 (type confusion bug, can be used to build universal Android rootin
 
 CVE-2019-2016
 
+REF: [Android Security](https://source.android.com/security/overview/acknowledgements)
+
+#### Trophy
+CVE-2018-9568 is nominated for the best privilege escalation bug at Pwine Award 2019.
+
+![]({{ "/images/PwnieAward2019.png" | absolute_url }})
